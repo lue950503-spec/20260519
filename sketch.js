@@ -15,6 +15,7 @@ let targetGesture = "";
 let winCount = 0;
 let lossCount = 0;
 let tieCount = 0;
+let fireworks = [];
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
@@ -127,8 +128,10 @@ function draw() {
         gameResult = checkWinner(userGesture, systemGesture);
         
         // 更新計分板
-        if (gameResult === '你贏了！') winCount++;
-        else if (gameResult === '你輸了！') lossCount++;
+        if (gameResult === '你贏了！') {
+          winCount++;
+          triggerFireworks(); // 觸發煙火特效
+        } else if (gameResult === '你輸了！') lossCount++;
         else tieCount++;
         
         gamePhase = "RESULT";
@@ -242,6 +245,15 @@ function draw() {
   textAlign(LEFT, TOP);
   text(`贏: ${winCount} | 輸: ${lossCount} | 平手: ${tieCount}`, 20, 20);
   pop();
+
+  // 繪製與更新煙火
+  for (let i = fireworks.length - 1; i >= 0; i--) {
+    fireworks[i].update();
+    fireworks[i].show();
+    if (fireworks[i].isDead()) {
+      fireworks.splice(i, 1);
+    }
+  }
 }
 
 function windowResized() {
@@ -277,4 +289,42 @@ function checkWinner(user, system) {
   if (user === '剪刀' && system === '布') return '你贏了！';
   if (user === '布' && system === '石頭') return '你贏了！';
   return '你輸了！';
+}
+
+// --- 煙火特效相關 ---
+function triggerFireworks() {
+  fireworks = [];
+  // 隨機產生 3 朵煙火
+  for (let i = 0; i < 3; i++) {
+    let cx = random(width * 0.2, width * 0.8);
+    let cy = random(height * 0.1, height * 0.4);
+    let col = [random(100, 255), random(100, 255), random(100, 255)]; // 隨機亮色系
+    for (let j = 0; j < 60; j++) {
+      fireworks.push(new Particle(cx, cy, col));
+    }
+  }
+}
+
+class Particle {
+  constructor(x, y, col) {
+    this.pos = createVector(x, y);
+    // 給予隨機的散射角度與力度
+    this.vel = p5.Vector.random2D().mult(random(2, 10));
+    this.acc = createVector(0, 0.2); // 模擬重力下墜
+    this.col = col;
+    this.alpha = 255;
+  }
+  update() {
+    this.vel.add(this.acc);
+    this.pos.add(this.vel);
+    this.alpha -= 4; // 逐漸變透明
+  }
+  show() {
+    noStroke();
+    fill(this.col[0], this.col[1], this.col[2], this.alpha);
+    circle(this.pos.x, this.pos.y, 8);
+  }
+  isDead() {
+    return this.alpha <= 0;
+  }
 }
