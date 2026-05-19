@@ -13,6 +13,9 @@ let gameResult = "";
 let resultTimer = 0;
 let holdCounter = 0;
 let targetGesture = "";
+let winCount = 0;
+let lossCount = 0;
+let tieCount = 0;
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
@@ -20,6 +23,9 @@ function setup() {
   videoElement = document.createElement('video');
   videoElement.width = 640;
   videoElement.height = 480;
+  videoElement.autoplay = true;
+  videoElement.playsInline = true;
+  videoElement.muted = true;
 
   hands = new Hands({locateFile: (file) => {
     return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
@@ -79,7 +85,9 @@ function draw() {
   translate(x, y);
   scale(-1, 1);
   imageMode(CENTER);
-  image(videoElement, 0, 0, imgW, imgH);
+  if (videoElement.readyState >= 2) {
+    image(videoElement, 0, 0, imgW, imgH);
+  }
 
   if (detections && detections.multiHandLandmarks) {
     stroke(255, 0, 0);
@@ -122,6 +130,12 @@ function draw() {
         let moves = ['石頭', '剪刀', '布'];
         systemGesture = moves[Math.floor(Math.random() * moves.length)];
         gameResult = checkWinner(userGesture, systemGesture);
+        
+        // 更新計分板
+        if (gameResult === '你贏了！') winCount++;
+        else if (gameResult === '你輸了！') lossCount++;
+        else tieCount++;
+        
         gamePhase = "RESULT";
         resultTimer = millis();
       }
@@ -164,6 +178,15 @@ function draw() {
     else fill(0);
     text(gameResult, width / 2, height * 0.9);
   }
+  pop();
+
+  // 顯示計分板
+  push();
+  fill(0);
+  noStroke();
+  textSize(24);
+  textAlign(LEFT, TOP);
+  text(`贏: ${winCount} | 輸: ${lossCount} | 平手: ${tieCount}`, 20, 20);
   pop();
 }
 
