@@ -84,9 +84,8 @@ function draw() {
   push();
   translate(x, y);
   scale(-1, 1);
-  imageMode(CENTER);
   if (videoElement.readyState >= 2) {
-    image(videoElement, 0, 0, imgW, imgH);
+    drawingContext.drawImage(videoElement, -imgW / 2, -imgH / 2, imgW, imgH);
   }
 
   if (detections && detections.multiHandLandmarks) {
