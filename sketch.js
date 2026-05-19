@@ -1,4 +1,4 @@
-let videoElement;
+let capture;
 let hands;
 let camera;
 let detections = {};
@@ -10,7 +10,6 @@ let gamePhase = "WAITING";
 let userGesture = "";
 let systemGesture = "";
 let gameResult = "";
-let resultTimer = 0;
 let holdCounter = 0;
 let targetGesture = "";
 let winCount = 0;
@@ -20,12 +19,10 @@ let tieCount = 0;
 function setup() {
   createCanvas(windowWidth, windowHeight);
 
-  videoElement = document.createElement('video');
-  videoElement.width = 640;
-  videoElement.height = 480;
-  videoElement.autoplay = true;
-  videoElement.playsInline = true;
-  videoElement.muted = true;
+  // 改回使用 p5.js 內建的 createCapture 解決攝像頭沒顯示與閃爍的問題
+  capture = createCapture(VIDEO);
+  capture.size(640, 480);
+  capture.hide();
 
   hands = new Hands({locateFile: (file) => {
     return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
@@ -40,9 +37,9 @@ function setup() {
     detections = results;
   });
 
-  camera = new Camera(videoElement, {
+  camera = new Camera(capture.elt, {
     onFrame: async () => {
-      await hands.send({image: videoElement});
+      await hands.send({image: capture.elt});
     },
     width: 640,
     height: 480
@@ -84,9 +81,8 @@ function draw() {
   push();
   translate(x, y);
   scale(-1, 1);
-  if (videoElement.readyState >= 2) {
-    drawingContext.drawImage(videoElement, -imgW / 2, -imgH / 2, imgW, imgH);
-  }
+  imageMode(CENTER);
+  image(capture, 0, 0, imgW, imgH);
 
   if (detections && detections.multiHandLandmarks) {
     stroke(255, 0, 0);
@@ -136,16 +132,51 @@ function draw() {
         else tieCount++;
         
         gamePhase = "RESULT";
-        resultTimer = millis();
+        holdCounter = 0;
+        targetGesture = "";
       }
     } else {
       holdCounter = 0;
       targetGesture = "";
     }
   } else if (gamePhase === "RESULT") {
-    // 顯示結果 3 秒後重新開始
-    if (millis() - resultTimer > 3000) {
-      gamePhase = "WAITING";
+    // 等待玩家比出 👍 或 👎
+    if (currentGesture === "👍" || currentGesture === "👎") {
+      if (currentGesture === targetGesture) {
+        holdCounter++;
+      } else {
+        targetGesture = currentGesture;
+        holdCounter = 1;
+      }
+      
+      if (holdCounter > 30) {
+        if (currentGesture === "👍") gamePhase = "WAITING";
+        else if (currentGesture === "👎") gamePhase = "END";
+        holdCounter = 0;
+        targetGesture = "";
+      }
+    } else {
+      holdCounter = 0;
+      targetGesture = "";
+    }
+  } else if (gamePhase === "END") {
+    if (currentGesture === "👍") {
+      if (currentGesture === targetGesture) {
+        holdCounter++;
+      } else {
+        targetGesture = currentGesture;
+        holdCounter = 1;
+      }
+      
+      if (holdCounter > 30) {
+        winCount = 0;
+        lossCount = 0;
+        tieCount = 0;
+        gamePhase = "WAITING";
+        holdCounter = 0;
+        targetGesture = "";
+      }
+    } else {
       holdCounter = 0;
       targetGesture = "";
     }
@@ -163,19 +194,43 @@ function draw() {
     text("目前手勢: " + currentGesture, width / 2, height * 0.9);
     
     // 顯示即將出拳的累積進度條
-    if (holdCounter > 0) {
+    if (holdCounter > 0 && (currentGesture === "石頭" || currentGesture === "剪刀" || currentGesture === "布")) {
       fill(255, 0, 0);
       rectMode(CENTER);
       rect(width / 2, height * 0.85, holdCounter * 5, 10);
     }
-  } else {
+  } else if (gamePhase === "RESULT") {
     textSize(48);
-    text("你出：" + userGesture + "  系統出：" + systemGesture, width / 2, height * 0.8);
+    text("你出：" + userGesture + "  系統出：" + systemGesture, width / 2, height * 0.75);
     // 依據輸贏結果改變顏色
     if (gameResult === '你贏了！') fill(0, 150, 0);
     else if (gameResult === '你輸了！') fill(255, 0, 0);
     else fill(0);
-    text(gameResult, width / 2, height * 0.9);
+    text(gameResult, width / 2, height * 0.85);
+
+    fill(0);
+    textSize(24);
+    text("👍 再一局 / 👎 結束計分", width / 2, height * 0.95);
+
+    if (holdCounter > 0 && (currentGesture === "👍" || currentGesture === "👎")) {
+      fill(255, 0, 0);
+      rectMode(CENTER);
+      rect(width / 2, height * 0.9, holdCounter * 5, 10);
+    }
+  } else if (gamePhase === "END") {
+    textSize(48);
+    text("遊戲結束", width / 2, height * 0.75);
+    textSize(32);
+    text(`最終成績 - 贏: ${winCount} | 輸: ${lossCount} | 平手: ${tieCount}`, width / 2, height * 0.85);
+    
+    textSize(24);
+    text("👍 重新開始", width / 2, height * 0.95);
+
+    if (holdCounter > 0 && currentGesture === "👍") {
+      fill(255, 0, 0);
+      rectMode(CENTER);
+      rect(width / 2, height * 0.9, holdCounter * 5, 10);
+    }
   }
   pop();
 
@@ -204,7 +259,11 @@ function detectGesture(landmarks) {
   // 計算伸直的手指數量 (true = 1, false = 0)
   let upCount = isIndexUp + isMiddleUp + isRingUp + isPinkyUp;
 
-  if (upCount === 0) return '石頭';
+  if (upCount === 0) {
+    if (landmarks[4].y < landmarks[5].y) return '👍'; // 大拇指朝上
+    if (landmarks[4].y > landmarks[0].y) return '👎'; // 大拇指朝下
+    return '石頭';
+  }
   if (upCount === 4) return '布';
   if (isIndexUp && isMiddleUp && !isRingUp && !isPinkyUp) return '剪刀';
 
