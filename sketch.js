@@ -34,6 +34,13 @@ function setup() {
 function draw() {
   background('#e7c6ff');
 
+  // 在畫布上方置中加上文字
+  fill(0);                     // 文字顏色設為黑色
+  noStroke();                  // 確保文字沒有邊框
+  textSize(32);                // 設定文字大小
+  textAlign(CENTER, CENTER);   // 設定文字對齊方式為中心
+  text("414730936 陸柏安", width / 2, height * 0.1);
+
   let imgW = width * 0.5;
   let imgH = height * 0.5;
   let x = width / 2;
